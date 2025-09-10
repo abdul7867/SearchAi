@@ -1,0 +1,46 @@
+{
+  "name": "SearchAI - AI-Powered Search Engine",
+  "short_name": "SearchAI",
+  "description": "AI-powered conversational search application with advanced features",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["productivity", "search", "ai"],
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Search",
+      "short_name": "Search",
+      "description": "Start a new AI-powered search",
+      "url": "/"
+    },
+    {
+      "name": "History",
+      "short_name": "History",
+      "description": "View search history",
+      "url": "/history"
+    },
+    {
+      "name": "Collections",
+      "short_name": "Collections",
+      "description": "Manage saved collections",
+      "url": "/collections"
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
+}

@@ -1,0 +1,162 @@
+# SearchAI - Git Ignore Configuration
+# Keep only essential code files, exclude documentation and deployment configs
+
+# ==========================================
+# DEPENDENCIES & NODE MODULES
+# ==========================================
+node_modules/
+*/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# ==========================================
+# ENVIRONMENT FILES
+# ==========================================
+.env
+.env.*
+!.env.example
+*.env
+env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+.env.vercel
+.env.render
+
+# ==========================================
+# BUILD OUTPUTS
+# ==========================================
+dist/
+build/
+*/dist/
+*/build/
+dist-ssr/
+.vite/
+.next/
+.nuxt/
+
+# ==========================================
+# DOCUMENTATION FILES (EXCLUDE)
+# ==========================================
+*.md
+!README.md
+DEPLOYMENT_REQUIREMENTS.md
+VERCEL_RENDER_DEPLOYMENT.md
+PRODUCTION_CHECKLIST.md
+DOUBLE_RESPONSE_FIX.md
+
+# ==========================================
+# DOCKER & DEPLOYMENT FILES (EXCLUDE)
+# ==========================================
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+
+# Deployment scripts
+deploy.sh
+deploy.bat
+deploy-*.sh
+deploy-*.bat
+
+# ==========================================
+# VERCEL & RENDER CONFIG FILES (EXCLUDE)
+# ==========================================
+# Allow vercel.json for deployment
+render.yaml
+.vercel/
+.render/
+
+# ==========================================
+# LOGS & DEBUGGING
+# ==========================================
+logs/
+*.log
+dev-debug.log
+lerna-debug.log*
+.storybook.log
+
+# ==========================================
+# TESTING & COVERAGE
+# ==========================================
+coverage/
+.nyc_output/
+.coverage/
+junit.xml
+test-results/
+playwright-report/
+test-results.xml
+
+# ==========================================
+# CACHE & TEMPORARY FILES
+# ==========================================
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+tmp/
+temp/
+.tmp/
+
+# ==========================================
+# IDE & EDITOR FILES
+# ==========================================
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-*
+
+# ==========================================
+# OS GENERATED FILES
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ==========================================
+# RUNTIME & PROCESS FILES
+# ==========================================
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ==========================================
+# PACKAGE MANAGER FILES
+# ==========================================
+.npm/
+.yarn/
+.pnpm/
+.yarn-integrity
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
+
+# ==========================================
+# STORYBOOK
+# ==========================================
+storybook-static/
+.storybook-out/
+
+# ==========================================
+# MISC
+# ==========================================
+*.tgz
+*.tar.gz
+.nyc_output
+.vite-ssg-dist
+.vite-ssg-temp
+Deployment.md
