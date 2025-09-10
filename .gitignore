@@ -160,3 +160,4 @@ storybook-static/
 .vite-ssg-dist
 .vite-ssg-temp
 Deployment.md
+.vercel
