@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Bookmark, Clock, ExternalLink, Trash2, Eye, FolderPlus, Tag, Calendar } from 'lucide-react';
+import { Search, Bookmark, Clock, ExternalLink, Trash2, Eye, FolderPlus, Tag, Calendar, Plus, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import historyStore from '../stores/historyStore';
 import collectionsStore from '../stores/collectionsStore';
@@ -7,12 +7,20 @@ import LoadingSkeleton from '../components/LoadingSkeleton';
 import { useToast } from '../contexts/ToastContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../components/Card';
 import Button from '../components/Button';
+import Input from '../components/Input';
 
 const History = () => {
   const [activeTab, setActiveTab] = useState('history'); // 'history' or 'bookmarked'
   const [currentPage, setCurrentPage] = useState(1);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [selectedSearch, setSelectedSearch] = useState(null);
+  const [showCreateCollectionInModal, setShowCreateCollectionInModal] = useState(false);
+  const [collectionSearchQuery, setCollectionSearchQuery] = useState('');
+  const [newCollectionData, setNewCollectionData] = useState({
+    name: '',
+    description: '',
+    color: '#3B82F6'
+  });
   const navigate = useNavigate();
   
   // Get state from stores
@@ -30,7 +38,7 @@ const History = () => {
     clearError 
   } = historyStore((state) => state); // ✅ FIXED: Use proper Zustand selector pattern
   
-  const { collections, fetchCollections, addSearchToCollection } = collectionsStore((state) => state); // ✅ FIXED: Use proper Zustand selector pattern
+  const { collections, fetchCollections, addSearchToCollection, createCollection } = collectionsStore((state) => state); // ✅ FIXED: Use proper Zustand selector pattern
   const { success: showSuccess, error: showError } = useToast();
 
   // Fetch data on component mount
@@ -77,6 +85,8 @@ const History = () => {
   const handleAddToCollection = (search) => {
     setSelectedSearch(search);
     setShowCollectionModal(true);
+    setCollectionSearchQuery('');
+    setShowCreateCollectionInModal(false);
   };
 
   const handleAddToCollectionConfirm = async (collectionId) => {
@@ -85,6 +95,8 @@ const History = () => {
       if (result.success) {
         setShowCollectionModal(false);
         setSelectedSearch(null);
+        setCollectionSearchQuery('');
+        setShowCreateCollectionInModal(false);
         showSuccess('Search Added', 'Search has been added to collection successfully!');
         // Refresh the current tab to show updated data
         if (activeTab === 'history') {
@@ -97,6 +109,60 @@ const History = () => {
       }
     }
   };
+
+  const handleCreateNewCollectionInModal = async (e) => {
+    e.preventDefault();
+    if (!newCollectionData.name.trim()) {
+      showError('Validation Error', 'Collection name is required');
+      return;
+    }
+
+    const result = await createCollection(newCollectionData);
+    if (result.success) {
+      // Automatically add the search to the newly created collection
+      if (selectedSearch && result.collection) {
+        const addResult = await addSearchToCollection(result.collection.id, selectedSearch.id);
+        if (addResult.success) {
+          setShowCollectionModal(false);
+          setSelectedSearch(null);
+          setShowCreateCollectionInModal(false);
+          setNewCollectionData({ name: '', description: '', color: '#3B82F6' });
+          setCollectionSearchQuery('');
+          showSuccess('Collection Created', 'New collection created and search added successfully!');
+          // Refresh collections and current tab
+          fetchCollections();
+          if (activeTab === 'history') {
+            fetchHistory(currentPage);
+          } else {
+            fetchBookmarked(currentPage);
+          }
+        } else {
+          showError('Add Failed', 'Collection created but failed to add search');
+        }
+      }
+    } else {
+      showError('Creation Failed', result.error || 'Failed to create collection');
+    }
+  };
+
+  const handleCancelCreateCollection = () => {
+    setShowCreateCollectionInModal(false);
+    setNewCollectionData({ name: '', description: '', color: '#3B82F6' });
+  };
+
+  const handleCloseCollectionModal = () => {
+    setShowCollectionModal(false);
+    setSelectedSearch(null);
+    setCollectionSearchQuery('');
+    setShowCreateCollectionInModal(false);
+    setNewCollectionData({ name: '', description: '', color: '#3B82F6' });
+  };
+
+  // Filter collections based on search query
+  const filteredCollectionsInModal = collections.filter(collection =>
+    collection.name.toLowerCase().includes(collectionSearchQuery.toLowerCase()) ||
+    (collection.description && collection.description.toLowerCase().includes(collectionSearchQuery.toLowerCase()))
+  );
 
   const handleViewSearch = (search) => {
     // Navigate to search page with query and focus parameters
@@ -355,46 +421,150 @@ const History = () => {
       {/* Collection Modal */}
       {showCollectionModal && selectedSearch && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-background rounded-lg p-6 max-w-md w-full">
+          <div className="bg-background rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-hidden">
             <h3 className="text-lg font-semibold mb-4">Add to Collection</h3>
             <p className="text-muted-foreground mb-4">
               Choose a collection to add "{selectedSearch.query}" to:
             </p>
             
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {collections.map((collection) => (
-                <button
-                  key={collection.id}
-                  onClick={() => handleAddToCollectionConfirm(collection.id)}
-                  className="w-full text-left p-3 rounded-lg border border-border hover:bg-accent transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: collection.color }}
-                    />
-                    <div className="flex-1">
-                      <h4 className="font-medium text-foreground">{collection.name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {collection.searchesCount} searches
-                      </p>
+            {!showCreateCollectionInModal ? (
+              <>
+                {/* Search Collections */}
+                {collections.length > 3 && (
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search collections..."
+                        value={collectionSearchQuery}
+                        onChange={(e) => setCollectionSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
                     </div>
                   </div>
-                </button>
-              ))}
-            </div>
-            
-            <div className="flex justify-end gap-2 mt-6">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowCollectionModal(false);
-                  setSelectedSearch(null);
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
+                )}
+                
+                {/* Create New Collection Button */}
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCreateCollectionInModal(true)}
+                  className="w-full mb-4 border-dashed border-2 hover:border-primary hover:bg-primary/5"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New Collection
+                </Button>
+                
+                {/* Collections List */}
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {filteredCollectionsInModal.length > 0 ? (
+                    filteredCollectionsInModal.map((collection) => (
+                      <button
+                        key={collection.id}
+                        onClick={() => handleAddToCollectionConfirm(collection.id)}
+                        className="w-full text-left p-3 rounded-lg border border-border hover:bg-accent transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-4 h-4 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: collection.color }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-foreground truncate">{collection.name}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {collection.searchesCount} searches
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <FolderPlus className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground text-sm">
+                        {collectionSearchQuery ? 'No collections found' : 'No collections available'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex justify-end gap-2 mt-6">
+                  <Button
+                    variant="outline"
+                    onClick={handleCloseCollectionModal}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </>
+            ) : (
+              /* Create Collection Form */
+              <form onSubmit={handleCreateNewCollectionInModal} className="space-y-4">
+                <div>
+                  <label htmlFor="modal-name" className="block text-sm font-medium text-foreground mb-2">
+                    Collection Name <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    id="modal-name"
+                    type="text"
+                    value={newCollectionData.name}
+                    onChange={(e) => setNewCollectionData({ ...newCollectionData, name: e.target.value })}
+                    placeholder="Enter collection name"
+                    required
+                    maxLength={100}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="modal-description" className="block text-sm font-medium text-foreground mb-2">
+                    Description
+                  </label>
+                  <Input
+                    id="modal-description"
+                    type="text"
+                    value={newCollectionData.description}
+                    onChange={(e) => setNewCollectionData({ ...newCollectionData, description: e.target.value })}
+                    placeholder="Enter description (optional)"
+                    maxLength={500}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="modal-color" className="block text-sm font-medium text-foreground mb-2">
+                    Color
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="modal-color"
+                      type="color"
+                      value={newCollectionData.color}
+                      onChange={(e) => setNewCollectionData({ ...newCollectionData, color: e.target.value })}
+                      className="w-12 h-10 rounded border border-border cursor-pointer"
+                    />
+                    <Input
+                      type="text"
+                      value={newCollectionData.color}
+                      onChange={(e) => setNewCollectionData({ ...newCollectionData, color: e.target.value })}
+                      placeholder="#3B82F6"
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancelCreateCollection}
+                  >
+                    Back
+                  </Button>
+                  <Button type="submit">
+                    Create & Add Search
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

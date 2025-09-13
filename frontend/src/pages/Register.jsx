@@ -5,6 +5,7 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../components/Card';
 import authStore from '../stores/authStore';
+import uiStore from '../stores/uiStore';
 import { useToast } from '../contexts/ToastContext';
 
 const Register = () => {
@@ -19,7 +20,8 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
-  const { register, loading, error, isAuthenticated } = authStore((state) => state); // ✅ FIXED: Use proper Zustand selector pattern
+  const { register, isAuthenticated } = authStore((state) => state);
+  const { loading, error } = uiStore((state) => state);
   const { success: showSuccess, error: showError } = useToast();
 
   useEffect(() => {

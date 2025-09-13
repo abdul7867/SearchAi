@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import axios from 'axios';
+import authStore from './authStore';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -23,13 +24,10 @@ const collectionsStore = create((set, get) => ({
 
   // Fetch user's collections
   fetchCollections: async (page = 1, limit = 20) => {
-    const token = localStorage.getItem('token');
+    const { isAuthenticated } = authStore.getState();
     
-    if (!token) {
-      set({ 
-        error: 'Authentication required. Please log in to view collections.',
-        loading: false 
-      });
+    if (!isAuthenticated) {
+      set({ error: 'Authentication required. Please log in to view collections.' });
       return;
     }
 
@@ -40,9 +38,9 @@ const collectionsStore = create((set, get) => ({
         `${API_BASE_URL}/collections?page=${page}&limit=${limit}`,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          withCredentials: true
         }
       );
 
@@ -50,14 +48,9 @@ const collectionsStore = create((set, get) => ({
         set({ 
           collections: response.data.data.collections,
           pagination: response.data.data.pagination,
-          loading: false,
-          error: null
         });
       } else {
-        set({ 
-          error: response.data.error?.message || 'Failed to fetch collections',
-          loading: false 
-        });
+        set({ error: response.data.error?.message || 'Failed to fetch collections' });
       }
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -69,7 +62,7 @@ const collectionsStore = create((set, get) => ({
       if (error.response) {
         if (error.response.status === 401) {
           errorMessage = 'Authentication expired. Please log in again.';
-          localStorage.removeItem('token');
+          authStore.getState().logout();
         } else if (error.response.data?.error?.message) {
           errorMessage = error.response.data.error.message;
         }
@@ -77,23 +70,19 @@ const collectionsStore = create((set, get) => ({
         errorMessage = 'Unable to connect to the server. Please check your internet connection.';
       }
 
-      set({ 
-        error: errorMessage,
-        loading: false 
-      });
+      set({ error: errorMessage });
+    } finally {
+      set({ loading: false });
     }
   },
 
   // Fetch collection by ID with searches
   fetchCollection: async (collectionId) => {
-    const token = localStorage.getItem('token');
+    const { isAuthenticated } = authStore.getState();
     
-    if (!token) {
-      set({ 
-        error: 'Authentication required. Please log in to view collection.',
-        loading: false 
-      });
-      return;
+    if (!isAuthenticated) {
+      set({ error: 'Authentication required. Please log in to view collection.' });
+      return { success: false, error: 'Authentication required' };
     }
 
     set({ loading: true, error: null });
@@ -103,23 +92,20 @@ const collectionsStore = create((set, get) => ({
         `${API_BASE_URL}/collections/${collectionId}`,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          withCredentials: true
         }
       );
 
       if (response.data.success) {
         set({ 
           currentCollection: response.data.data.collection,
-          loading: false,
-          error: null
         });
+        return { success: true, collection: response.data.data.collection };
       } else {
-        set({ 
-          error: response.data.error?.message || 'Failed to fetch collection',
-          loading: false 
-        });
+        set({ error: response.data.error?.message || 'Failed to fetch collection' });
+        return { success: false, error: response.data.error?.message || 'Failed to fetch collection' };
       }
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -131,7 +117,7 @@ const collectionsStore = create((set, get) => ({
       if (error.response) {
         if (error.response.status === 401) {
           errorMessage = 'Authentication expired. Please log in again.';
-          localStorage.removeItem('token');
+          authStore.getState().logout();
         } else if (error.response.status === 404) {
           errorMessage = 'Collection not found';
         } else if (error.response.data?.error?.message) {
@@ -141,22 +127,19 @@ const collectionsStore = create((set, get) => ({
         errorMessage = 'Unable to connect to the server. Please check your internet connection.';
       }
 
-      set({ 
-        error: errorMessage,
-        loading: false 
-      });
+      set({ error: errorMessage });
+      return { success: false, error: errorMessage };
+    } finally {
+      set({ loading: false });
     }
   },
 
   // Create new collection
   createCollection: async (collectionData) => {
-    const token = localStorage.getItem('token');
+    const { isAuthenticated } = authStore.getState();
     
-    if (!token) {
-      set({ 
-        error: 'Authentication required. Please log in to create collections.',
-        loading: false 
-      });
+    if (!isAuthenticated) {
+      set({ error: 'Authentication required. Please log in to create collections.' });
       return { success: false, error: 'Authentication required' };
     }
 
@@ -168,9 +151,9 @@ const collectionsStore = create((set, get) => ({
         collectionData,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          withCredentials: true
         }
       );
 
@@ -179,15 +162,10 @@ const collectionsStore = create((set, get) => ({
         const newCollection = response.data.data.collection;
         set(state => ({
           collections: [newCollection, ...state.collections],
-          loading: false,
-          error: null
         }));
         return { success: true, collection: newCollection };
       } else {
-        set({ 
-          error: response.data.error?.message || 'Failed to create collection',
-          loading: false 
-        });
+        set({ error: response.data.error?.message || 'Failed to create collection' });
         return { success: false, error: response.data.error?.message };
       }
     } catch (error) {
@@ -200,7 +178,7 @@ const collectionsStore = create((set, get) => ({
       if (error.response) {
         if (error.response.status === 401) {
           errorMessage = 'Authentication expired. Please log in again.';
-          localStorage.removeItem('token');
+          authStore.getState().logout();
         } else if (error.response.status === 409) {
           errorMessage = 'Collection with this name already exists';
         } else if (error.response.data?.error?.message) {
@@ -210,24 +188,20 @@ const collectionsStore = create((set, get) => ({
         errorMessage = 'Unable to connect to the server. Please check your internet connection.';
       }
 
-      set({ 
-        error: errorMessage,
-        loading: false 
-      });
+      set({ error: errorMessage });
       
       return { success: false, error: errorMessage };
+    } finally {
+      set({ loading: false });
     }
   },
 
   // Update collection
   updateCollection: async (collectionId, updateData) => {
-    const token = localStorage.getItem('token');
+    const { isAuthenticated } = authStore.getState();
     
-    if (!token) {
-      set({ 
-        error: 'Authentication required. Please log in to update collections.',
-        loading: false 
-      });
+    if (!isAuthenticated) {
+      set({ error: 'Authentication required. Please log in to update collections.' });
       return { success: false, error: 'Authentication required' };
     }
 
@@ -239,9 +213,9 @@ const collectionsStore = create((set, get) => ({
         updateData,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          withCredentials: true
         }
       );
 
@@ -256,16 +230,11 @@ const collectionsStore = create((set, get) => ({
           currentCollection: state.currentCollection?.id === collectionId 
             ? updatedCollection 
             : state.currentCollection,
-          loading: false,
-          error: null
         }));
         
         return { success: true, collection: updatedCollection };
       } else {
-        set({ 
-          error: response.data.error?.message || 'Failed to update collection',
-          loading: false 
-        });
+        set({ error: response.data.error?.message || 'Failed to update collection' });
         return { success: false, error: response.data.error?.message };
       }
     } catch (error) {
@@ -278,7 +247,7 @@ const collectionsStore = create((set, get) => ({
       if (error.response) {
         if (error.response.status === 401) {
           errorMessage = 'Authentication expired. Please log in again.';
-          localStorage.removeItem('token');
+          authStore.getState().logout();
         } else if (error.response.status === 404) {
           errorMessage = 'Collection not found';
         } else if (error.response.data?.error?.message) {
@@ -288,24 +257,20 @@ const collectionsStore = create((set, get) => ({
         errorMessage = 'Unable to connect to the server. Please check your internet connection.';
       }
 
-      set({ 
-        error: errorMessage,
-        loading: false 
-      });
+      set({ error: errorMessage });
       
       return { success: false, error: errorMessage };
+    } finally {
+      set({ loading: false });
     }
   },
 
   // Delete collection
   deleteCollection: async (collectionId) => {
-    const token = localStorage.getItem('token');
+    const { isAuthenticated } = authStore.getState();
     
-    if (!token) {
-      set({ 
-        error: 'Authentication required. Please log in to delete collections.',
-        loading: false 
-      });
+    if (!isAuthenticated) {
+      set({ error: 'Authentication required. Please log in to delete collections.' });
       return { success: false, error: 'Authentication required' };
     }
 
@@ -316,9 +281,9 @@ const collectionsStore = create((set, get) => ({
         `${API_BASE_URL}/collections/${collectionId}`,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          withCredentials: true
         }
       );
 
@@ -329,16 +294,11 @@ const collectionsStore = create((set, get) => ({
           currentCollection: state.currentCollection?.id === collectionId 
             ? null 
             : state.currentCollection,
-          loading: false,
-          error: null
         }));
         
         return { success: true };
       } else {
-        set({ 
-          error: response.data.error?.message || 'Failed to delete collection',
-          loading: false 
-        });
+        set({ error: response.data.error?.message || 'Failed to delete collection' });
         return { success: false, error: response.data.error?.message };
       }
     } catch (error) {
@@ -349,7 +309,7 @@ const collectionsStore = create((set, get) => ({
       if (error.response) {
         if (error.response.status === 401) {
           errorMessage = 'Authentication expired. Please log in again.';
-          localStorage.removeItem('token');
+          authStore.getState().logout();
         } else if (error.response.status === 404) {
           errorMessage = 'Collection not found';
         } else if (error.response.data?.error?.message) {
@@ -359,24 +319,20 @@ const collectionsStore = create((set, get) => ({
         errorMessage = 'Unable to connect to the server. Please check your internet connection.';
       }
 
-      set({ 
-        error: errorMessage,
-        loading: false 
-      });
+      set({ error: errorMessage });
       
       return { success: false, error: errorMessage };
+    } finally {
+      set({ loading: false });
     }
   },
 
   // Add search to collection
   addSearchToCollection: async (collectionId, searchId) => {
-    const token = localStorage.getItem('token');
+    const { isAuthenticated } = authStore.getState();
     
-    if (!token) {
-      set({ 
-        error: 'Authentication required. Please log in to add searches to collections.',
-        loading: false 
-      });
+    if (!isAuthenticated) {
+      set({ error: 'Authentication required. Please log in to add searches to collections.' });
       return { success: false, error: 'Authentication required' };
     }
 
@@ -386,9 +342,9 @@ const collectionsStore = create((set, get) => ({
         { searchId },
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          withCredentials: true
         }
       );
 
@@ -400,10 +356,7 @@ const collectionsStore = create((set, get) => ({
         
         return { success: true };
       } else {
-        set({ 
-          error: response.data.error?.message || 'Failed to add search to collection',
-          loading: false 
-        });
+        set({ error: response.data.error?.message || 'Failed to add search to collection' });
         return { success: false, error: response.data.error?.message };
       }
     } catch (error) {
@@ -416,7 +369,7 @@ const collectionsStore = create((set, get) => ({
       if (error.response) {
         if (error.response.status === 401) {
           errorMessage = 'Authentication expired. Please log in again.';
-          localStorage.removeItem('token');
+          authStore.getState().logout();
         } else if (error.response.status === 404) {
           errorMessage = 'Collection or search not found';
         } else if (error.response.data?.error?.message) {
@@ -426,10 +379,7 @@ const collectionsStore = create((set, get) => ({
         errorMessage = 'Unable to connect to the server. Please check your internet connection.';
       }
 
-      set({ 
-        error: errorMessage,
-        loading: false 
-      });
+      set({ error: errorMessage });
       
       return { success: false, error: errorMessage };
     }
@@ -437,13 +387,10 @@ const collectionsStore = create((set, get) => ({
 
   // Remove search from collection
   removeSearchFromCollection: async (collectionId, searchId) => {
-    const token = localStorage.getItem('token');
+    const { isAuthenticated } = authStore.getState();
     
-    if (!token) {
-      set({ 
-        error: 'Authentication required. Please log in to remove searches from collections.',
-        loading: false 
-      });
+    if (!isAuthenticated) {
+      set({ error: 'Authentication required. Please log in to remove searches from collections.' });
       return { success: false, error: 'Authentication required' };
     }
 
@@ -452,9 +399,9 @@ const collectionsStore = create((set, get) => ({
         `${API_BASE_URL}/collections/${collectionId}/searches/${searchId}`,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          withCredentials: true
         }
       );
 
@@ -466,10 +413,7 @@ const collectionsStore = create((set, get) => ({
         
         return { success: true };
       } else {
-        set({ 
-          error: response.data.error?.message || 'Failed to remove search from collection',
-          loading: false 
-        });
+        set({ error: response.data.error?.message || 'Failed to remove search from collection' });
         return { success: false, error: response.data.error?.message };
       }
     } catch (error) {
@@ -482,7 +426,7 @@ const collectionsStore = create((set, get) => ({
       if (error.response) {
         if (error.response.status === 401) {
           errorMessage = 'Authentication expired. Please log in again.';
-          localStorage.removeItem('token');
+          authStore.getState().logout();
         } else if (error.response.status === 404) {
           errorMessage = 'Collection or search not found';
         } else if (error.response.data?.error?.message) {
@@ -492,10 +436,7 @@ const collectionsStore = create((set, get) => ({
         errorMessage = 'Unable to connect to the server. Please check your internet connection.';
       }
 
-      set({ 
-        error: errorMessage,
-        loading: false 
-      });
+      set({ error: errorMessage });
       
       return { success: false, error: errorMessage };
     }
@@ -505,8 +446,6 @@ const collectionsStore = create((set, get) => ({
   reset: () => set({
     collections: [],
     currentCollection: null,
-    loading: false,
-    error: null,
     pagination: { page: 1, limit: 20, total: 0, pages: 0 }
   })
 }));

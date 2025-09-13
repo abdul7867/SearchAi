@@ -5,9 +5,18 @@ class SearchService {
   constructor() {
     // DuckDuckGo doesn't require API key - it's completely free!
     this.geminiApiKey = process.env.GEMINI_API_KEY;
+    this.openRouterApiKey = process.env.OPENROUTER_API_KEY;
     // DuckDuckGo Instant Answer API endpoint
     this.searchEndpoint = 'https://api.duckduckgo.com/';
     this.geminiEndpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+    this.openRouterEndpoint = 'https://openrouter.ai/api/v1/chat/completions';
+    // Preferred model order for OpenRouter (free models first)
+    this.openRouterModels = [
+      'google/gemini-2.0-flash-exp:free',
+      'meta-llama/llama-3.2-3b-instruct:free',
+      'microsoft/phi-3-mini-128k-instruct:free',
+      'google/gemini-pro-1.5-exp'
+    ];
   }
 
   /**
@@ -189,12 +198,22 @@ class SearchService {
   }
 
   /**
-   * Generate AI response using Gemini
+   * Generate AI response using OpenRouter (with Gemini fallback)
    */
   async generateAIResponse(query, searchResults, focus = 'general') {
+    // Try OpenRouter first if configured
+    if (this.openRouterApiKey && this.openRouterApiKey !== 'your-openrouter-api-key-here') {
+      try {
+        return await this.generateOpenRouterResponse(query, searchResults, focus);
+      } catch (openRouterError) {
+        console.log('⚠️ OpenRouter failed, falling back to Gemini:', openRouterError.message);
+      }
+    }
+
+    // Fallback to Gemini
     try {
       if (!this.geminiApiKey) {
-        throw new Error('Gemini API key not configured. Please set GEMINI_API_KEY in your .env file');
+        throw new Error('No AI API keys configured. Please set OPENROUTER_API_KEY or GEMINI_API_KEY in your .env file');
       }
       
       if (this.geminiApiKey === 'your-actual-gemini-api-key-here' || this.geminiApiKey.includes('your-')) {
@@ -216,8 +235,6 @@ class SearchService {
         }]
       };
       
-      console.log('📤 Request body:', JSON.stringify(requestBody, null, 2));
-      
       const response = await axios.post(
         `${this.geminiEndpoint}?key=${this.geminiApiKey}`,
         requestBody,
@@ -230,7 +247,7 @@ class SearchService {
 
       return this.processGeminiResponse(response.data);
     } catch (error) {
-      console.error('❌ Gemini API error:', error.message);
+      console.error('❌ AI API error:', error.message);
       
       if (error.response) {
         console.error('📊 Error response status:', error.response.status);
@@ -240,6 +257,94 @@ class SearchService {
       
       throw new Error('Failed to generate AI response');
     }
+  }
+
+  /**
+   * Generate AI response using OpenRouter
+   */
+  async generateOpenRouterResponse(query, searchResults, focus = 'general') {
+    try {
+      console.log('🚀 Using OpenRouter API for AI response generation');
+      
+      const context = this.prepareOpenRouterContext(query, searchResults, focus);
+      
+      // Try models in order of preference (free models first)
+      for (const model of this.openRouterModels) {
+        try {
+          console.log(`🤖 Trying OpenRouter model: ${model}`);
+          
+          const requestBody = {
+            model: model,
+            messages: [
+              {
+                role: 'system',
+                content: 'You are an AI assistant that provides comprehensive, well-structured answers based on search results. Always cite sources and provide accurate information.'
+              },
+              {
+                role: 'user',
+                content: context
+              }
+            ],
+            max_tokens: 1000,
+            temperature: 0.7
+          };
+          
+          const response = await axios.post(
+            this.openRouterEndpoint,
+            requestBody,
+            {
+              headers: {
+                'Authorization': `Bearer ${this.openRouterApiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': process.env.CORS_ORIGIN || 'http://localhost:5173',
+                'X-Title': 'SearchAI'
+              },
+              timeout: 30000
+            }
+          );
+          
+          if (response.data.choices && response.data.choices[0]) {
+            console.log(`✅ OpenRouter response successful with model: ${model}`);
+            return response.data.choices[0].message.content;
+          }
+        } catch (modelError) {
+          console.log(`⚠️ Model ${model} failed:`, modelError.message);
+          continue; // Try next model
+        }
+      }
+      
+      throw new Error('All OpenRouter models failed');
+    } catch (error) {
+      console.error('❌ OpenRouter API error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Prepare context for OpenRouter AI (OpenAI format)
+   */
+  prepareOpenRouterContext(query, searchResults, focus) {
+    return `Please provide a comprehensive answer to this search query based on the provided search results.
+
+Query: "${query}"
+Focus: ${focus}
+
+Search Results:
+${searchResults.map((result, index) => 
+  `${index + 1}. ${result.title}\n   Source: ${result.url}\n   Content: ${result.snippet}`
+).join('\n\n')}
+
+Instructions:
+1. Provide a clear, comprehensive answer to the query
+2. Use information from the search results above
+3. Structure your response with paragraphs and bullet points where appropriate
+4. If focus is "academic", use formal language and cite sources
+5. If focus is "news", emphasize current information and timeliness
+6. If focus is "technical", include technical details and examples
+7. Keep response under 800 words
+8. Always acknowledge the sources you used
+
+Response:`;
   }
 
   /**

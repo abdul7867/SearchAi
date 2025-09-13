@@ -5,13 +5,13 @@
 const activeRequests = new Map();
 
 export const requestTracker = (req, res, next) => {
-  const requestId = `${req.method}-${req.url}-${Date.now()}-${Math.random()}`;
+  const requestId = `${req.method}-${req.originalUrl}-${Date.now()}-${Math.random()}`;
   req.requestId = requestId;
   
   // Track active requests
   activeRequests.set(requestId, {
     method: req.method,
-    url: req.url,
+    url: req.originalUrl,
     timestamp: Date.now(),
     userId: req.user?.id || 'anonymous'
   });
@@ -25,7 +25,7 @@ export const requestTracker = (req, res, next) => {
     if (responseSent) {
       console.warn(`⚠️ Duplicate response attempt prevented for ${requestId}`, {
         method: req.method,
-        url: req.url,
+        url: req.originalUrl,
         userId: req.user?.id || 'anonymous'
       });
       return;
@@ -33,7 +33,7 @@ export const requestTracker = (req, res, next) => {
     
     responseSent = true;
     activeRequests.delete(requestId);
-    console.log(`📤 Response sent: ${requestId} - ${req.method} ${req.url}`);
+    console.log(`📤 Response sent: ${requestId} - ${req.method} ${req.originalUrl}`);
     
     // Call original end method
     return originalEnd.apply(this, args);
@@ -42,7 +42,7 @@ export const requestTracker = (req, res, next) => {
   // Cleanup on request close/abort
   req.on('close', () => {
     if (!responseSent) {
-      console.log(`🚫 Request aborted: ${requestId} - ${req.method} ${req.url}`);
+      console.log(`🚫 Request aborted: ${requestId} - ${req.method} ${req.originalUrl}`);
       activeRequests.delete(requestId);
     }
   });
@@ -53,7 +53,7 @@ export const requestTracker = (req, res, next) => {
   });
   
   // Log request start
-  console.log(`📥 Request started: ${requestId} - ${req.method} ${req.url}`);
+  console.log(`📥 Request started: ${requestId} - ${req.method} ${req.originalUrl}`);
   
   next();
 };

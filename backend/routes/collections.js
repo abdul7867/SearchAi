@@ -42,6 +42,52 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
+// @desc    Get collection by ID with searches
+// @route   GET /api/collections/:id
+// @access  Private
+router.get('/:id', protect, async (req, res) => {
+  try {
+    const collection = await Collection.findById(req.params.id)
+      .populate({
+        path: 'searches',
+        select: 'query focus isBookmarked createdAt',
+        options: { sort: { createdAt: -1 } }
+      });
+
+    if (!collection) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'Collection not found' }
+      });
+    }
+
+    // Check if user owns this collection
+    if (collection.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Not authorized to access this collection' }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        collection: {
+          ...collection.summary,
+          searches: collection.searches
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Get collection error:', error);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Server error while fetching collection' }
+    });
+  }
+});
+
 // @desc    Create new collection
 // @route   POST /api/collections
 // @access  Private
@@ -77,12 +123,12 @@ router.post('/', protect, [
       });
     }
 
-    const { name, description, tags = [], color = '#3B82F6' } = req.body;
+    const { name, description, tags, color } = req.body;
 
-    // Check if collection name already exists for this user
+    // Check if user already has a collection with this name
     const existingCollection = await Collection.findOne({
       userId: req.user._id,
-      name: name
+      name: name.trim()
     });
 
     if (existingCollection) {
@@ -92,13 +138,16 @@ router.post('/', protect, [
       });
     }
 
-    const collection = await Collection.create({
+    // Create new collection
+    const collection = new Collection({
       userId: req.user._id,
-      name,
-      description,
-      tags,
-      color
+      name: name.trim(),
+      description: description?.trim(),
+      tags: tags || [],
+      color: color || '#3B82F6'
     });
+
+    await collection.save();
 
     res.status(201).json({
       success: true,
@@ -113,49 +162,6 @@ router.post('/', protect, [
     res.status(500).json({
       success: false,
       error: { message: 'Server error while creating collection' }
-    });
-  }
-});
-
-// @desc    Get collection by ID with searches
-// @route   GET /api/collections/:id
-// @access  Private
-router.get('/:id', protect, async (req, res) => {
-  try {
-    const collection = await Collection.findById(req.params.id)
-      .populate('userId', 'name email')
-      .populate('searches');
-
-    if (!collection) {
-      return res.status(404).json({
-        success: false,
-        error: { message: 'Collection not found' }
-      });
-    }
-
-    // Check if user owns this collection
-    if (collection.userId._id.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        error: { message: 'Not authorized to access this collection' }
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        collection: {
-          ...collection.summary,
-          searches: collection.searches.map(search => search.summary)
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Get collection error:', error);
-    res.status(500).json({
-      success: false,
-      error: { message: 'Server error while fetching collection' }
     });
   }
 });

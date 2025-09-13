@@ -62,19 +62,19 @@ describe('SourceCard', () => {
 
   it('applies compact layout when compact prop is true', () => {
     render(<SourceCard source={defaultSource} compact={true} />);
-    const card = screen.getByText('Test Source Title').closest('div');
+    const card = screen.getByRole('link');
     expect(card).toHaveClass('p-3');
   });
 
   it('applies default layout when compact prop is false', () => {
     render(<SourceCard source={defaultSource} compact={false} />);
-    const card = screen.getByText('Test Source Title').closest('div');
+    const card = screen.getByRole('link');
     expect(card).toHaveClass('p-4');
   });
 
   it('applies custom className when provided', () => {
     render(<SourceCard source={defaultSource} className="custom-class" />);
-    const card = screen.getByText('Test Source Title').closest('div');
+    const card = screen.getByRole('link');
     expect(card).toHaveClass('custom-class');
   });
 
@@ -144,7 +144,7 @@ describe('SourceCard', () => {
 
   it('applies hover effects and transitions', () => {
     render(<SourceCard source={defaultSource} />);
-    const card = screen.getByText('Test Source Title').closest('div');
+    const card = screen.getByRole('link');
     expect(card).toHaveClass('hover:bg-accent/50', 'transition-all', 'duration-200');
   });
 

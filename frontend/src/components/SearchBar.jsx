@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Loader2, Filter, ChevronDown, X, Sparkles } from 'lucide-react';
 
-const SearchBar = ({ onSearch, isLoading, selectedFocus, initialQuery = '' }) => {
+const SearchBar = ({ onSearch, isLoading, selectedFocus, initialQuery = '', clearAfterSearch = true }) => {
   const [query, setQuery] = useState(initialQuery);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -116,6 +116,13 @@ const SearchBar = ({ onSearch, isLoading, selectedFocus, initialQuery = '' }) =>
       onSearch(query.trim(), selectedFocus, advancedOptions);
       setShowSuggestions(false);
       setFocusedSuggestion(-1);
+      
+      // Clear the search input after successful submission if enabled
+      if (clearAfterSearch) {
+        setTimeout(() => {
+          setQuery('');
+        }, 500); // Small delay to show the search was submitted
+      }
     }
   };
 
@@ -124,6 +131,13 @@ const SearchBar = ({ onSearch, isLoading, selectedFocus, initialQuery = '' }) =>
     setShowSuggestions(false);
     setFocusedSuggestion(-1);
     onSearch(suggestion, selectedFocus, advancedOptions);
+    
+    // Clear the search input after successful submission if enabled
+    if (clearAfterSearch) {
+      setTimeout(() => {
+        setQuery('');
+      }, 500); // Small delay to show the search was submitted
+    }
   };
 
   const handleAdvancedOptionChange = (key, value) => {

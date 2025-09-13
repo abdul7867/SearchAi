@@ -67,11 +67,21 @@ router.post('/register', [
       // Update last login
       await user.updateLastLogin();
 
+      // Set secure HTTP-only cookie
+      const isProduction = process.env.NODE_ENV === 'production';
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: isProduction, // Only send over HTTPS in production
+        sameSite: isProduction ? 'none' : 'lax', // Cross-site cookies for production
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: '/'
+      });
+
       return res.status(201).json({
         success: true,
         data: {
           user: user.profile,
-          token
+          token // Keep for backward compatibility
         },
         message: 'User registered successfully'
       });
@@ -149,11 +159,21 @@ router.post('/login', [
     // Update last login
     await user.updateLastLogin();
 
+    // Set secure HTTP-only cookie
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: isProduction, // Only send over HTTPS in production
+      sameSite: isProduction ? 'none' : 'lax', // Cross-site cookies for production
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/'
+    });
+
     return res.json({
       success: true,
       data: {
         user: user.profile,
-        token
+        token // Keep for backward compatibility
       },
       message: 'Login successful'
     });
@@ -307,10 +327,18 @@ router.put('/password', protect, [
   }
 });
 
-// @desc    Logout user (client-side token removal)
+// @desc    Logout user (clear cookie)
 // @route   POST /api/auth/logout
 // @access  Private
 router.post('/logout', protect, (req, res) => {
+  // Clear the authentication cookie
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/'
+  });
+
   return res.json({
     success: true,
     message: 'Logout successful'

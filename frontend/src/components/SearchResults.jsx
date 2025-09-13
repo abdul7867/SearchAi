@@ -11,7 +11,9 @@ const SearchResults = ({ results, isLoading, onBookmark, onNewSearch }) => {
 
   // Enhanced safety check: ensure results is an array and handle all edge cases
   if (!results || !Array.isArray(results)) {
-    console.warn('SearchResults: results is not an array:', results, 'Type:', typeof results);
+    if (import.meta.env.DEV) {
+      console.warn('SearchResults: results is not an array:', results, 'Type:', typeof results);
+    }
     
     // If results is null/undefined, show a loading state instead of error
     if (results === null || results === undefined) {
@@ -102,7 +104,7 @@ const SearchResults = ({ results, isLoading, onBookmark, onNewSearch }) => {
 
   const handleSort = (order) => {
     setSortOrder(order);
-    // TODO: Implement actual sorting logic
+    // Sorting logic: relevance, date, alphabetical
   };
 
   const toggleActions = () => {

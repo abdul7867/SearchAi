@@ -10,15 +10,15 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import History from './pages/History';
 import Collections from './pages/Collections';
+import CollectionDetail from './pages/CollectionDetail';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
-import TestingDashboard from './components/TestingDashboard';
 import authStore from './stores/authStore';
 import SmoothScrollToTop from './components/SmoothScrollToTop';
 import './App.css';
 
 function App() {
-  const { checkAuth } = authStore((state) => state); // ✅ FIXED: Use proper Zustand selector pattern
+  const checkAuth = authStore((state) => state.checkAuth); // ✅ FIXED: Use proper Zustand selector pattern
 
   useEffect(() => {
     // Check authentication status on app start
@@ -32,29 +32,56 @@ function App() {
           <Router>
             <Layout>
               <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/search" element={<Home />} />
+                <Route
+                  path="/"
+                  element={
+                    <ErrorBoundary>
+                      <Home />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/search"
+                  element={
+                    <ErrorBoundary>
+                      <Home />
+                    </ErrorBoundary>
+                  }
+                />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
-                <Route 
-                  path="/history" 
+                <Route
+                  path="/history"
                   element={
                     <ProtectedRoute>
-                      <History />
+                      <ErrorBoundary>
+                        <History />
+                      </ErrorBoundary>
                     </ProtectedRoute>
-                  } 
+                  }
                 />
-                <Route 
-                  path="/collections" 
+                <Route
+                  path="/collections"
                   element={
                     <ProtectedRoute>
-                      <Collections />
+                      <ErrorBoundary>
+                        <Collections />
+                      </ErrorBoundary>
                     </ProtectedRoute>
-                  } 
+                  }
+                />
+                <Route
+                  path="/collections/:id"
+                  element={
+                    <ProtectedRoute>
+                      <ErrorBoundary>
+                        <CollectionDetail />
+                      </ErrorBoundary>
+                    </ProtectedRoute>
+                  }
                 />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
-                <Route path="/testing" element={<TestingDashboard />} />
               </Routes>
             </Layout>
             <SmoothScrollToTop />

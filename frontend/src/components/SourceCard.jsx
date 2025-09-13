@@ -65,9 +65,16 @@ const SourceCard = ({
   };
 
   return (
-    <div className={`group border border-border rounded-lg p-3 sm:p-4 hover:bg-accent/50 transition-all duration-200 hover:border-primary/30 ${className} ${
-      compact ? 'p-3' : 'p-4'
-    }`}>
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`group block border border-border rounded-lg p-3 sm:p-4 hover:bg-accent/50 transition-all duration-200 hover:border-primary/30 cursor-pointer ${className} ${
+        compact ? 'p-3' : 'p-4'
+      }`}
+      title={`Open ${title} in new tab`}
+      aria-label={`Open ${title} in new tab`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0 space-y-2">
           {/* Title */}
@@ -120,21 +127,9 @@ const SourceCard = ({
           </div>
         </div>
         
-        {/* External link button */}
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`flex-shrink-0 p-2 text-muted-foreground hover:text-primary hover:bg-accent rounded-md transition-all duration-200 group-hover:scale-105 ${
-            compact ? 'p-1.5' : 'p-2'
-          }`}
-          title="Open source in new tab"
-          aria-label={`Open ${title} in new tab`}
-        >
-          <ExternalLink className={`${compact ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
-        </a>
+        {/* Card is now fully clickable */}
       </div>
-    </div>
+    </a>
   );
 };
 

@@ -1,24 +1,24 @@
 import { create } from 'zustand';
 import axios from 'axios';
+import uiStore from './uiStore';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+// Configure axios to include credentials (cookies) with requests
+axios.defaults.withCredentials = true;
 
 const authStore = create((set, get) => ({
   // State
   user: null,
-  token: localStorage.getItem('token') || null,
-  loading: false,
-  error: null,
+  token: null, // Remove localStorage dependency
   isAuthenticated: false,
 
   // Actions
-  setLoading: (loading) => set({ loading }),
-  setError: (error) => set({ error }),
-  clearError: () => set({ error: null }),
 
   // Login action
   login: async (email, password) => {
-    set({ loading: true, error: null });
+    uiStore.getState().setLoading(true);
+    uiStore.getState().clearError();
 
     try {
       const response = await axios.post(`${API_BASE_URL}/auth/login`, {
@@ -27,28 +27,21 @@ const authStore = create((set, get) => ({
       });
 
       if (response.data.success) {
-        const { token, user } = response.data.data;
+        const { user } = response.data.data;
         
-        // Store token in localStorage
-        localStorage.setItem('token', token);
-        
-        // Set axios default header for future requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        // No need to store token - it's now in HTTP-only cookie
+        // Remove any existing Authorization header
+        delete axios.defaults.headers.common['Authorization'];
         
         set({ 
           user,
-          token,
+          token: null, // Token is now in cookie
           isAuthenticated: true,
-          loading: false,
-          error: null
         });
 
         return { success: true };
       } else {
-        set({ 
-          error: response.data.error?.message || 'Login failed',
-          loading: false 
-        });
+        uiStore.getState().setError(response.data.error?.message || 'Login failed');
         return { success: false, error: response.data.error?.message };
       }
     } catch (error) {
@@ -68,18 +61,18 @@ const authStore = create((set, get) => ({
         errorMessage = 'Unable to connect to the server. Please check your internet connection.';
       }
 
-      set({ 
-        error: errorMessage,
-        loading: false 
-      });
+      uiStore.getState().setError(errorMessage);
       
       return { success: false, error: errorMessage };
+    } finally {
+      uiStore.getState().setLoading(false);
     }
   },
 
   // Register action
   register: async (name, email, password) => {
-    set({ loading: true, error: null });
+    uiStore.getState().setLoading(true);
+    uiStore.getState().clearError();
 
     try {
       const response = await axios.post(`${API_BASE_URL}/auth/register`, {
@@ -89,28 +82,21 @@ const authStore = create((set, get) => ({
       });
 
       if (response.data.success) {
-        const { token, user } = response.data.data;
+        const { user } = response.data.data;
         
-        // Store token in localStorage
-        localStorage.setItem('token', token);
-        
-        // Set axios default header for future requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        // No need to store token - it's now in HTTP-only cookie
+        // Remove any existing Authorization header
+        delete axios.defaults.headers.common['Authorization'];
         
         set({ 
           user,
-          token,
+          token: null, // Token is now in cookie
           isAuthenticated: true,
-          loading: false,
-          error: null
         });
 
         return { success: true };
       } else {
-        set({ 
-          error: response.data.error?.message || 'Registration failed',
-          loading: false 
-        });
+        uiStore.getState().setError(response.data.error?.message || 'Registration failed');
         return { success: false, error: response.data.error?.message };
       }
     } catch (error) {
@@ -130,19 +116,23 @@ const authStore = create((set, get) => ({
         errorMessage = 'Unable to connect to the server. Please check your internet connection.';
       }
 
-      set({ 
-        error: errorMessage,
-        loading: false 
-      });
+      uiStore.getState().setError(errorMessage);
       
       return { success: false, error: errorMessage };
+    } finally {
+      uiStore.getState().setLoading(false);
     }
   },
 
   // Logout action
-  logout: () => {
-    // Remove token from localStorage
-    localStorage.removeItem('token');
+  logout: async () => {
+    try {
+      // Call logout endpoint to clear cookie
+      await axios.post(`${API_BASE_URL}/auth/logout`);
+    } catch (error) {
+      console.error('Logout request failed:', error);
+      // Continue with local logout even if request fails
+    }
     
     // Remove axios default header
     delete axios.defaults.headers.common['Authorization'];
@@ -152,61 +142,65 @@ const authStore = create((set, get) => ({
       user: null,
       token: null,
       isAuthenticated: false,
-      loading: false,
-      error: null
     });
   },
 
   // Check if user is authenticated on app start
   checkAuth: async () => {
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      set({ isAuthenticated: false });
-      return;
-    }
-
     try {
-      // Set axios default header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // Remove any existing Authorization header - we use cookies now
+      delete axios.defaults.headers.common['Authorization'];
       
-      const response = await axios.get(`${API_BASE_URL}/users/me`);
+      const response = await axios.get(`${API_BASE_URL}/auth/me`);
       
       if (response.data.success) {
         set({ 
           user: response.data.data.user,
-          token,
+          token: null, // Token is in cookie
           isAuthenticated: true
         });
+        return true;
       } else {
-        // Invalid token, clear it
-        localStorage.removeItem('token');
-        delete axios.defaults.headers.common['Authorization'];
+        // Invalid token/cookie
         set({ 
           user: null,
           token: null,
           isAuthenticated: false
         });
+        return false;
       }
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Auth check error:', error);
+      // Handle different types of authentication errors
+      const isNetworkError = !error.response;
+      const isUnauthorized = error.response?.status === 401;
+      const isServerError = error.response?.status >= 500;
+      
+      // Only log errors in development, and only if they're not expected auth failures
+      if (import.meta.env.DEV && !isUnauthorized) {
+        console.warn('Auth check failed:', {
+          message: error.message,
+          status: error.response?.status,
+          isNetworkError,
+          isServerError
+        });
       }
       
-      // Clear invalid token
-      localStorage.removeItem('token');
-      delete axios.defaults.headers.common['Authorization'];
+      // Clear authentication state
       set({ 
         user: null,
         token: null,
         isAuthenticated: false
       });
+      
+      // Return false to indicate auth check failed
+      return false;
     }
   },
 
   // Update user profile
   updateProfile: async (updates) => {
-    set({ loading: true, error: null });
+    uiStore.getState().setLoading(true);
+    uiStore.getState().clearError();
 
     try {
       const response = await axios.put(`${API_BASE_URL}/auth/profile`, updates);
@@ -214,15 +208,10 @@ const authStore = create((set, get) => ({
       if (response.data.success) {
         set({ 
           user: response.data.data.user,
-          loading: false,
-          error: null
         });
         return { success: true };
       } else {
-        set({ 
-          error: response.data.error?.message || 'Profile update failed',
-          loading: false 
-        });
+        uiStore.getState().setError(response.data.error?.message || 'Profile update failed');
         return { success: false, error: response.data.error?.message };
       }
     } catch (error) {
@@ -236,12 +225,11 @@ const authStore = create((set, get) => ({
         errorMessage = error.response.data.error.message;
       }
 
-      set({ 
-        error: errorMessage,
-        loading: false 
-      });
+      uiStore.getState().setError(errorMessage);
       
       return { success: false, error: errorMessage };
+    } finally {
+      uiStore.getState().setLoading(false);
     }
   }
 }));

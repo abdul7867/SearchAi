@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { connectDB } from './config/database.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -28,6 +29,12 @@ if (missingEnvVars.length > 0) {
   }
 }
 
+// Set default values for non-critical env vars in development
+if (process.env.NODE_ENV !== 'production') {
+  process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'mock-gemini-api-key';
+  process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
+}
+
 console.log('🔧 Environment Configuration:');
 console.log('- NODE_ENV:', process.env.NODE_ENV);
 console.log('- PORT:', process.env.PORT || 5000);
@@ -43,28 +50,40 @@ const PORT = process.env.PORT || 5000;
 app.use(helmet());
 
 // Enhanced CORS configuration
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      process.env.CORS_ORIGIN,
+const isProduction = process.env.NODE_ENV === 'production';
+
+const allowedOrigins = isProduction
+  ? [process.env.CORS_ORIGIN, /^https:\/\/perpexclone.*\.vercel\.app$/]
+  : [
       'http://localhost:3000',
       'http://localhost:5173',
-      'http://localhost:4173'
-    ].filter(Boolean); // Remove any undefined values
-    
-    // Check if origin matches allowed origins or Vercel preview deployments
-    const isAllowed = allowedOrigins.includes(origin) || 
-                     (origin && origin.match(/^https:\/\/perpexclone.*\.vercel\.app$/));
+      'http://localhost:4173',
+      'http://localhost:6006', // Storybook
+    ];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests) in non-production environments
+    if (!origin && !isProduction) {
+      return callback(null, true);
+    }
+
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (!origin) return false;
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      }
+      if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
     
     if (isAllowed) {
       callback(null, true);
     } else {
       console.log('❌ CORS blocked origin:', origin);
-      console.log('✅ Allowed origins:', allowedOrigins);
-      console.log('✅ Vercel pattern allowed: https://perpexclone*.vercel.app');
+      console.log('✅ Allowed origins:', allowedOrigins.map(o => o.toString()));
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -88,6 +107,9 @@ app.use('/api/', limiter);
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Cookie parsing middleware
+app.use(cookieParser());
 
 // Request tracking middleware (must be before routes)
 app.use(requestTracker);
@@ -178,3 +200,4 @@ const startServer = async () => {
 startServer();
 
 export default app;
+

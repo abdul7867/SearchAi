@@ -451,22 +451,7 @@
 .feature-custom-properties { /* CSS Custom Properties support styles */ }
 .feature-animations { /* CSS Animations support styles */ }
 
-/* ==========================================================================
-   Debug and Development
-   ========================================================================== */
-
-/* Debug outlines for development */
-.debug * {
-  outline: 1px solid red;
-}
-
-.debug .grid * {
-  outline: 1px solid blue;
-}
-
-.debug .flex * {
-  outline: 1px solid green;
-}
+/* Debug classes removed for production build */
 
 /* Browser information display */
 .browser-info::before {

@@ -1,7 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { axe, toHaveNoViolations } from 'jest-axe';
 import Input from './Input';
-import { runComprehensiveKeyboardTest } from '../utils/keyboardNavigation';
 
 // Extend Jest matchers for accessibility testing
 expect.extend(toHaveNoViolations);

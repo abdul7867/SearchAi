@@ -12,6 +12,7 @@ yarn-error.log*
 pnpm-debug.log*
 .pnpm-debug.log*
 
+
 # ==========================================
 # ENVIRONMENT FILES
 # ==========================================
@@ -71,6 +72,18 @@ deploy-*.bat
 render.yaml
 .vercel/
 .render/
+/Docs/.env.example
+/Docs/package.json
+/Docs/test-backend.html
+/Docs/vercel.json
+/Docs/README.md
+/Docs/DEPLOYMENT_REQUIREMENTS.md
+/Docs/VERCEL_RENDER_DEPLOYMENT.md
+/Docs/PRODUCTION_CHECKLIST.md
+/Docs/DOUBLE_RESPONSE_FIX.md
+/api/index.js
+README.md
+
 
 # ==========================================
 # LOGS & DEBUGGING

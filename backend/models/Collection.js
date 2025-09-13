@@ -57,24 +57,13 @@ collectionSchema.virtual('summary').get(function() {
     id: this._id,
     name: this.name,
     description: this.description,
-    searchesCount: this.searches.length,
-    tags: this.tags,
-    isPublic: this.isPublic,
     color: this.color,
+    isPublic: this.isPublic,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
-    metadata: {
-      totalSearches: this.metadata.totalSearches,
-      lastUpdated: this.metadata.lastUpdated
-    }
+    searchCount: this.searches.length, // Renamed for clarity
+    lastUpdated: this.metadata.lastUpdated
   };
-});
-
-// Virtual for collection with populated searches
-collectionSchema.virtual('searchesWithDetails', {
-  ref: 'Search',
-  localField: 'searches',
-  foreignField: '_id'
 });
 
 // Method to add search to collection
@@ -123,9 +112,9 @@ collectionSchema.statics.findByUser = function(userId, options = {}) {
   
   return this.find({ userId })
     .sort(sort)
-    .limit(limit * 1)
+    .limit(limit)
     .skip((page - 1) * limit)
-    .populate('userId', 'name email');
+    .select('name description color isPublic searches createdAt updatedAt metadata'); // Select specific fields
 };
 
 // Static method to find public collections
@@ -155,9 +144,9 @@ collectionSchema.statics.findByTag = function(tag, options = {}) {
 
 // Pre-save middleware to update metadata
 collectionSchema.pre('save', function(next) {
+  this.metadata.lastUpdated = new Date();
   if (this.isModified('searches')) {
     this.metadata.totalSearches = this.searches.length;
-    this.metadata.lastUpdated = new Date();
   }
   next();
 });

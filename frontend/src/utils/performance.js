@@ -21,8 +21,8 @@ export function monitorLCP() {
       if (lastEntry) {
         const lcp = lastEntry.startTime;
         if (import.meta.env.DEV) {
-        console.log(`LCP: ${lcp}ms`);
-      }
+          console.log(`LCP: ${lcp}ms`);
+        }
         
         // Report to analytics or performance monitoring service
         if (lcp > CORE_WEB_VITALS.LCP && import.meta.env.DEV) {
@@ -46,8 +46,8 @@ export function monitorFID() {
       entries.forEach((entry) => {
         const fid = entry.processingStart - entry.startTime;
         if (import.meta.env.DEV) {
-        console.log(`FID: ${fid}ms`);
-      }
+          console.log(`FID: ${fid}ms`);
+        }
         
         if (fid > CORE_WEB_VITALS.FID && import.meta.env.DEV) {
           console.warn(`FID exceeds threshold: ${fid}ms > ${CORE_WEB_VITALS.FID}ms`);
@@ -122,8 +122,8 @@ export function monitorResourceTiming() {
           const size = entry.transferSize;
           
           if (import.meta.env.DEV) {
-          console.log(`${entry.initiatorType} loaded in ${duration}ms, size: ${size} bytes`);
-        }
+            console.log(`${entry.initiatorType} loaded in ${duration}ms, size: ${size} bytes`);
+          }
           
           // Warn about slow resources
           if (duration > 1000 && import.meta.env.DEV) {

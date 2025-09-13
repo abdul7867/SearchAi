@@ -77,40 +77,18 @@ const searchSchema = new mongoose.Schema({
 
 // Virtual for search summary (excluding long answer text)
 searchSchema.virtual('summary').get(function() {
+  const answer = this.answer || '';
   return {
     id: this._id,
     query: this.query,
-    answerPreview: this.answer.substring(0, 200) + (this.answer.length > 200 ? '...' : ''),
+    answerPreview: answer.substring(0, 200) + (answer.length > 200 ? '...' : ''),
+    url: `/search?q=${encodeURIComponent(this.query)}&focus=${this.focus}`,
     sourcesCount: this.sources.length,
-    sources: this.sources.map(source => ({
-      title: source.title,
-      url: source.url,
-      snippet: source.snippet,
-      domain: source.domain
-    })),
     focus: this.focus,
-    focusLabel: this.focus.charAt(0).toUpperCase() + this.focus.slice(1),
     createdAt: this.createdAt,
-    isBookmarked: this.isBookmarked,
-    metadata: {
-      processingTime: this.metadata.processingTime,
-      tokensUsed: this.metadata.tokensUsed,
-      searchResultsCount: this.metadata.searchResultsCount
-    }
+    isBookmarked: this.isBookmarked
   };
 });
-
-// Method to add source
-searchSchema.methods.addSource = function(source) {
-  this.sources.push(source);
-  return this.save();
-};
-
-// Method to remove source
-searchSchema.methods.removeSource = function(sourceId) {
-  this.sources = this.sources.filter(source => source._id.toString() !== sourceId);
-  return this.save();
-};
 
 // Method to toggle bookmark
 searchSchema.methods.toggleBookmark = function() {
@@ -120,30 +98,25 @@ searchSchema.methods.toggleBookmark = function() {
 
 // Static method to find searches by user
 searchSchema.statics.findByUser = function(userId, options = {}) {
-  const { page = 1, limit = 10, sort = { createdAt: -1 } } = options;
+  const { page = 1, limit = 10, sort = { createdAt: -1 }, bookmarked } = options;
   
-  return this.find({ userId })
+  const query = { userId };
+  if (bookmarked) {
+    query.isBookmarked = true;
+  }
+
+  return this.find(query)
     .sort(sort)
-    .limit(limit * 1)
+    .limit(limit)
     .skip((page - 1) * limit)
-    .populate('userId', 'name email');
-};
-
-// Static method to find searches by conversation
-searchSchema.statics.findByConversation = function(conversationId) {
-  return this.find({ conversationId }).sort({ createdAt: 1 });
-};
-
-// Static method to find bookmarked searches
-searchSchema.statics.findBookmarked = function(userId) {
-  return this.find({ userId, isBookmarked: true }).sort({ createdAt: -1 });
+    .select('query answer sources focus isBookmarked createdAt'); // Select specific fields
 };
 
 // Indexes for better query performance
 searchSchema.index({ userId: 1, createdAt: -1 });
+searchSchema.index({ userId: 1, isBookmarked: 1, createdAt: -1 }); // For bookmarked searches
 searchSchema.index({ conversationId: 1 });
 searchSchema.index({ focus: 1 });
-searchSchema.index({ isBookmarked: 1 });
 searchSchema.index({ query: 'text' }); // Text search index
 
 const Search = mongoose.model('Search', searchSchema);

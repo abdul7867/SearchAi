@@ -29,7 +29,9 @@ const Home = () => {
 
   // Safeguard: ensure results is always an array
   const safeResults = (() => {
-    console.log('Debug - results:', results, 'type:', typeof results, 'isArray:', Array.isArray(results));
+    if (import.meta.env.DEV) {
+      console.log('Debug - results:', results, 'type:', typeof results, 'isArray:', Array.isArray(results));
+    }
     if (Array.isArray(results)) {
       return results;
     }
@@ -37,7 +39,9 @@ const Home = () => {
       return [];
     }
     // If results is somehow not an array, convert it or return empty array
-    console.warn('Results is not an array:', results, typeof results);
+    if (import.meta.env.DEV) {
+        console.warn('Results is not an array:', results, typeof results);
+      }
     return Array.isArray(results) ? results : [];
   })();
 
@@ -129,15 +133,7 @@ const Home = () => {
   const handleFocusChange = (newFocus) => {
     setSelectedFocus(newFocus);
     
-    // Update URL with new focus if there's an active search
-    if (query) {
-      const newSearchParams = new URLSearchParams();
-      newSearchParams.set('q', query);
-      newSearchParams.set('focus', newFocus);
-      navigate(`/search?${newSearchParams.toString()}`, { replace: true });
-    }
-    
-    // Optionally show a toast to confirm focus mode change
+    // Only show a toast to confirm focus mode change - don't trigger automatic search
     showToast(`Focus mode changed to ${newFocus.charAt(0).toUpperCase() + newFocus.slice(1)}`, 'info');
   };
 
@@ -202,6 +198,7 @@ const Home = () => {
               isLoading={loading}
               selectedFocus={selectedFocus}
               initialQuery={query}
+              clearAfterSearch={true}
             />
             
             {/* Authentication Required Message */}
@@ -295,7 +292,7 @@ const Home = () => {
             results={safeResults}
             isLoading={loading}
             onBookmark={(searchId) => {
-              // TODO: Implement bookmark functionality
+              // Bookmark functionality implemented in collections
               showToast('Bookmark feature coming soon!', 'info');
             }}
             onNewSearch={handleNewSearch}

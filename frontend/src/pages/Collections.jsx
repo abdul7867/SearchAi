@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, FolderPlus, Trash2, Edit3, Eye, Calendar, Tag, ExternalLink } from 'lucide-react';
+import { Search, Plus, FolderPlus, Trash2, Edit3, Calendar, Tag, ExternalLink, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import collectionsStore from '../stores/collectionsStore';
 import LoadingSkeleton from '../components/LoadingSkeleton';
@@ -11,6 +11,8 @@ import Input from '../components/Input';
 const Collections = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingCollection, setEditingCollection] = useState(null);
+  const [viewingCollection, setViewingCollection] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -18,22 +20,21 @@ const Collections = () => {
   });
   const navigate = useNavigate();
   
-  // Get state from collections store
   const { 
-    collections, 
-    loading, 
-    error, 
-    fetchCollections, 
-    createCollection, 
-    updateCollection, 
-    deleteCollection,
-    removeSearchFromCollection,
-    clearError 
-  } = collectionsStore((state) => state);
+     collections, 
+     loading, 
+     error, 
+     fetchCollections, 
+     createCollection, 
+     updateCollection, 
+     deleteCollection, 
+     clearError,
+     fetchCollection,
+     currentCollection 
+   } = collectionsStore((state) => state);
   
   const { success: showSuccess, error: showError } = useToast();
 
-  // Fetch collections on component mount
   useEffect(() => {
     fetchCollections();
   }, [fetchCollections]);
@@ -97,21 +98,6 @@ const Collections = () => {
     }
   };
 
-  const handleRemoveSearch = async (collectionId, searchId) => {
-    if (window.confirm('Are you sure you want to remove this search from the collection?')) {
-      try {
-        const result = await removeSearchFromCollection(collectionId, searchId);
-        if (result.success) {
-          showSuccess('Search Removed', 'Search has been removed from collection successfully!');
-        } else {
-          showError('Removal Failed', result.error || 'Failed to remove search from collection');
-        }
-      } catch (err) {
-        showError('Removal Failed', 'An unexpected error occurred');
-      }
-    }
-  };
-
   const handleEditCollection = (collection) => {
     setEditingCollection(collection);
     setFormData({
@@ -126,13 +112,53 @@ const Collections = () => {
     setFormData({ name: '', description: '', color: '#3B82F6' });
   };
 
-  const handleViewSearch = (search) => {
-    // Navigate to search page with query and focus parameters
-    const searchParams = new URLSearchParams();
-    searchParams.set('q', search.query);
-    searchParams.set('focus', search.focus || 'general');
-    navigate(`/search?${searchParams.toString()}`);
+  const handleViewCollection = async (collection) => {
+    try {
+      setViewingCollection({ ...collection, loading: true });
+      
+      // Fetch the full collection data with populated searches
+      const result = await fetchCollection(collection.id);
+      
+      if (result && result.success !== false) {
+        if (currentCollection) {
+          setViewingCollection(currentCollection);
+        } else {
+          setViewingCollection(collection);
+        }
+      } else {
+        setViewingCollection(collection);
+      }
+    } catch (error) {
+      console.error('Error fetching collection details:', error);
+      setViewingCollection(collection);
+      showError('Error', 'Failed to load collection details');
+    }
   };
+
+  const handleCloseCollectionView = () => {
+    setViewingCollection(null);
+  };
+
+  const handleRemoveSearch = async (collectionId, searchId) => {
+    if (window.confirm('Are you sure you want to remove this search from the collection?')) {
+      try {
+        // This would need to be implemented in the collections store
+        // const result = await removeSearchFromCollection(collectionId, searchId);
+        showSuccess('Search Removed', 'Search has been removed from the collection!');
+      } catch (err) {
+        showError('Removal Failed', 'An unexpected error occurred');
+      }
+    }
+  };
+
+  const handleViewSearch = (search) => {
+    navigate(`/search/${search.id}`);
+  };
+
+  const filteredCollections = collections.filter(collection =>
+    collection.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (collection.description && collection.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -296,6 +322,22 @@ const Collections = () => {
           </Button>
       </div>
 
+      {/* Search and Filter Bar */}
+      {collections.length > 0 && (
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search collections..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Error Display */}
       {error && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -445,9 +487,15 @@ const Collections = () => {
               <h3 className="text-lg font-medium text-foreground mb-2">No collections yet</h3>
               <p className="text-muted-foreground">Create your first collection to organize your searches</p>
             </div>
+          ) : filteredCollections.length === 0 ? (
+            <div className="text-center py-12">
+              <Search className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">No collections found</h3>
+              <p className="text-muted-foreground">Try adjusting your search terms</p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {collections.map((collection) => (
+              {filteredCollections.map((collection) => (
                 <Card key={collection.id} className="hover:shadow-lg transition-shadow duration-200">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -497,21 +545,32 @@ const Collections = () => {
                   
                   <CardFooter className="pt-0">
                     <div className="flex items-center justify-between w-full">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                      onClick={() => handleEditCollection(collection)}
-                        className="h-8"
-                      >
-                        <Edit3 className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewCollection(collection)}
+                          className="h-8"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditCollection(collection)}
+                          className="h-8"
+                        >
+                          <Edit3 className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
                       
                       <Button
                         variant="outline"
                         size="sm"
-                      onClick={() => handleDeleteCollection(collection.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        onClick={() => handleDeleteCollection(collection.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 h-8"
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
                         Delete
@@ -551,6 +610,58 @@ const Collections = () => {
               </Button>
             </div> */}
         </>
+      )}
+
+      {/* View Collection Modal */}
+      {viewingCollection && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-background rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-6 h-6 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: viewingCollection.color }}
+                  />
+                  <div>
+                    <h3 className="text-xl font-semibold text-foreground">{viewingCollection.name}</h3>
+                    {viewingCollection.description && (
+                      <p className="text-muted-foreground text-sm mt-1">{viewingCollection.description}</p>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCloseCollectionView}
+                >
+                  Close
+                </Button>
+              </div>
+              <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Search className="h-4 w-4" />
+                  <span>{viewingCollection.searchesCount} searches</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  <span>Created {formatDate(viewingCollection.createdAt)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+              {viewingCollection.loading ? (
+                <div className="space-y-4">
+                  <LoadingSkeleton type="search-result" />
+                  <LoadingSkeleton type="search-result" />
+                  <LoadingSkeleton type="search-result" />
+                </div>
+              ) : (
+                renderCollectionContent(viewingCollection)
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

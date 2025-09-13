@@ -49,6 +49,35 @@ router.post('/', protect, [
     const { query, focus = 'general', conversationId } = req.body;
     const startTime = Date.now();
 
+    // Check for duplicate searches within the last 5 minutes
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const existingSearch = await Search.findOne({
+      userId: req.user._id,
+      query: { $regex: new RegExp(`^${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      focus,
+      createdAt: { $gte: fiveMinutesAgo }
+    }).sort({ createdAt: -1 });
+
+    if (existingSearch) {
+      console.log('🔄 Returning existing search result to prevent duplicate');
+      return res.status(200).json({
+        success: true,
+        data: {
+          search: {
+            id: existingSearch._id,
+            query: existingSearch.query,
+            answer: existingSearch.answer,
+            sources: existingSearch.sources,
+            focus: existingSearch.focus,
+            conversationId: existingSearch.conversationId,
+            createdAt: existingSearch.createdAt,
+            metadata: existingSearch.metadata
+          }
+        },
+        message: 'Search completed successfully (cached result)'
+      });
+    }
+
     // Always get DuckDuckGo results first (this is free and always works)
     let webResults;
     let searchResults;

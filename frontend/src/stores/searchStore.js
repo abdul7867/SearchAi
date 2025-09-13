@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import axios from 'axios';
+import uiStore from './uiStore';
+import authStore from './authStore';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -7,8 +9,6 @@ const searchStore = create((set, get) => ({
   // State
   query: '',
   results: null,
-  loading: false,
-  error: null,
   focus: 'general',
   conversationId: null,
   currentRequestController: null, // Add AbortController for request cancellation
@@ -25,21 +25,16 @@ const searchStore = create((set, get) => ({
   },
   
   clearResults: () => {
-    set({ results: null, error: null });
-  },
-  clearError: () => {
-    set({ error: null });
+    set({ results: null });
+    uiStore.getState().clearError();
   },
 
   // Search action with deduplication
   performSearch: async (query, focus = 'general', advancedOptions = {}, conversationId = null) => {
-    const token = localStorage.getItem('token');
+    const { isAuthenticated } = authStore.getState();
     
-    if (!token) {
-      set({ 
-        error: 'Authentication required. Please log in to search.',
-        loading: false 
-      });
+    if (!isAuthenticated) {
+      uiStore.getState().setError('Authentication required. Please log in to search.');
       return;
     }
 
@@ -53,9 +48,10 @@ const searchStore = create((set, get) => ({
     // Create new AbortController for this request
     const controller = new AbortController();
 
+    uiStore.getState().setLoading(true);
+    uiStore.getState().clearError();
+
     set({ 
-      loading: true, 
-      error: null,
       query,
       focus,
       conversationId,
@@ -68,9 +64,9 @@ const searchStore = create((set, get) => ({
         { query, focus, conversationId, ...advancedOptions },
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
+          withCredentials: true,
           signal: controller.signal // Add signal for request cancellation
         }
       );
@@ -120,9 +116,8 @@ const searchStore = create((set, get) => ({
         if (!Array.isArray(transformedResults)) {
           set({ 
             results: [],
-            loading: false,
-            error: 'Invalid results format received from server'
           });
+          uiStore.getState().setError('Invalid results format received from server');
           return;
         }
         
@@ -133,17 +128,14 @@ const searchStore = create((set, get) => ({
         
         set({ 
           results: transformedResults,
-          loading: false,
-          error: null,
           currentRequestController: null // Clear the controller on success
         });
       } else {
         set({ 
           results: [], // ✅ FIXED: Ensure results is always an array, even on error
-          error: response.data.error?.message || 'Search failed',
-          loading: false,
           currentRequestController: null
         });
+        uiStore.getState().setError(response.data.error?.message || 'Search failed');
       }
     } catch (error) {
       // Check if the error is due to request cancellation
@@ -162,8 +154,8 @@ const searchStore = create((set, get) => ({
         // Server responded with error status
         if (error.response.status === 401) {
           errorMessage = 'Authentication expired. Please log in again.';
-          // Clear invalid token
-          localStorage.removeItem('token');
+          // Clear authentication state
+          authStore.getState().logout();
         } else if (error.response.status === 429) {
           errorMessage = 'Too many requests. Please wait a moment before searching again.';
         } else if (error.response.data?.error?.message) {
@@ -176,10 +168,11 @@ const searchStore = create((set, get) => ({
 
       set({ 
         results: [], // ✅ FIXED: Ensure results is always an array, even on error
-        error: errorMessage,
-        loading: false,
         currentRequestController: null
       });
+      uiStore.getState().setError(errorMessage);
+    } finally {
+      uiStore.getState().setLoading(false);
     }
   },
 
@@ -194,8 +187,6 @@ const searchStore = create((set, get) => ({
     set({
       query: '',
       results: null,
-      loading: false,
-      error: null,
       focus: 'general',
       conversationId: null,
       currentRequestController: null
